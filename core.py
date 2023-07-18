@@ -31,6 +31,8 @@ class VkTools:
         result = {'name': info['first_name'] + ' ' + info['last_name'] if 'first_name' in info and 'last_name' in info else None,
                       'sex': info.get('sex') if info.get('sex') is not None else None,
                       'city': info.get('city')['title'] if info.get('city') is not None else None,
+                      # 'city': None if info.get('city') is not None else None,
+                      # 'year': None if info.get('bdate') is not None else None,
                       'year': self._bdate_toyear(info.get('bdate')) if info.get('bdate') is not None else None
                       }
 
@@ -84,12 +86,3 @@ class VkTools:
 
 if __name__ == '__main__':
     pass
-    # user_id =
-    # tools = VkTools(access_token)
-    # params = tools.get_profile_info(user_id)
-    # worksheets = tools.search_worksheet(params)
-    # worksheet = worksheets.pop()
-    # photos = tools.get_photos(worksheet['id'])
-
-# pprint(params)
-# pprint(worksheet)

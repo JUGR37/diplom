@@ -1,4 +1,5 @@
 # импорты
+import sqlalchemy.exc
 import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
@@ -30,24 +31,20 @@ class BotInterface():
                          }
                        )
 
-    def get_feedback(self, par, mes, user_id):
-        if self.params[par] is None:
-            self.message_send(user_id, mes)
-            for event in self.longpoll.listen():
-                if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text:
-                    result = event.text
-                    return result
+    def get_feedback(self):
+        for event in self.longpoll.listen():
+            if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text:
+                result = event.text
+                return result
 
-    # def get_photos(self, user_id, worksheets):
-    #     worksheet = worksheets.pop()
-    #     if not data_store.check_user(data_store.engine, user_id, worksheet['id']):
-    #         data_store.add_user(data_store.engine, user_id, worksheet['id'])
-    #         photos = self.vk_tools.get_photos(worksheet['id'])
-    #         photo_string = ''
-    #         for photo in photos:
-    #             photo_string += f'photo{photo["owner_id"]}_{photo["id"]},'
-    #             return f'имя: {worksheet["name"]} ссылка: vk.com/{worksheet["id"]}', photo_string
-
+    def get_photos(self, user_id, worksheet):
+        if not data_store.check_user(data_store.engine, user_id, worksheet):
+            data_store.add_user(data_store.engine, user_id, worksheet)
+            photos = self.vk_tools.get_photos(worksheet)
+            photo_string = ''
+            for photo in photos:
+                photo_string += f'photo{photo["owner_id"]}_{photo["id"]},'
+            return photo_string
 
     # обработка событий / получение сообщений
 
@@ -58,66 +55,43 @@ class BotInterface():
                     '''логика для получения данных о пользователе'''
                     self.params = self.vk_tools.get_profile_info(event.user_id)
                     self.message_send(event.user_id, f'Привет, {self.params["name"]}')
-                    if self.params['sex'] is None:
-                        if self.get_feedback('sex', 'Кого ищем? 1-женщину, 2- мужчину', event.user_id) == '2':
-                            self.params.update({'sex': 1})
-                        elif self.get_feedback('sex', 'Кого ищем? 1-женщину, 2- мужчину', event.user_id) == '1':
-                            self.params.update({'sex': 2})
-                        else:
-                            self.message_send(event.user_id,
-                                          'Введите только 1 или 2')
                     if self.params['city'] is None:
-                        self.params.update({'city': self.get_feedback('city', 'Сообщите город, в котором ищем пару', event.user_id).lower()})
-                    # break
+                        self.message_send(event.user_id, 'Сообщите город, в котором ищем пару')
+                        feedback = self.get_feedback()
+                        self.params.update({'city': feedback.lower()})
                     if self.params['year'] is None:
-                        self.params.update({'year': self.vk_tools._bdate_toyear(self.get_feedback('year', 'Укажите дату вашего рождения: дд.мм.гггг', event.user_id))})
-
-                            # try:
-                            #     datetime.strptime(
-                            #         self.get_feedback('year', 'Укажите дату вашего рождения: дд.мм.гггг', event.user_id),
-                            #         '%d.%m.%Y')
-                            # except ValueError:
-                            #     self.message_send(event.user_id, 'Неверный формат даты, должно быть ДД.ММ.ГГГГ')
-                            # else:
-                            #     self.params.update({'year': self.vk_tools._bdate_toyear(
-                            #         self.get_feedback('year', 'Укажите дату вашего рождения: дд.мм.гггг', event.user_id))})
+                        self.message_send(event.user_id, 'Укажите дату вашего рождения: дд.мм.гггг')
+                        feedback = self.get_feedback()
+                        self.params.update({'year': self.vk_tools._bdate_toyear(feedback)})
 
                     self.message_send(event.user_id, f'{self.params["name"]}, напишите "поиск" и мы начинаем искать!')
-
-
 
                 elif event.text.lower() == 'поиск':
                     '''логика для поиска анкет'''
                     self.message_send(event.user_id, 'Начинаем поиск')
+
                     if self.worksheets:
-                        # print(f'1: {self.get_photos(event.user_id, self.worksheets)[0]}')
-                        # print(f'1: {self.get_photos(event.user_id, self.worksheets)[1]}')
                         worksheet = self.worksheets.pop()
-                        if not data_store.check_user(data_store.engine, event.user_id, worksheet['id']):
-                            data_store.add_user(data_store.engine, event.user_id, worksheet['id'])
-                            photos = self.vk_tools.get_photos(worksheet['id'])
-                            photo_string = ''
-                            for photo in photos:
-                                photo_string += f'photo{photo["owner_id"]}_{photo["id"]},'
+                        outcome = self.get_photos(event.user_id, worksheet['id'])
+
 
                     else:
                         self.worksheets = self.vk_tools.search_worksheet(self.params, self.offset)
-                        # print(self.get_photos(event.user_id, self.worksheets)[0])
-                        # print(self.get_photos(event.user_id, self.worksheets)[1])
                         worksheet = self.worksheets.pop()
-                        if not data_store.check_user(data_store.engine, event.user_id, worksheet['id']):
-                            data_store.add_user(data_store.engine, event.user_id, worksheet['id'])
-                            photos = self.vk_tools.get_photos(worksheet['id'])
-                            photo_string = ''
-                            for photo in photos:
-                                photo_string += f'photo{photo["owner_id"]}_{photo["id"]},'
+                        outcome = self.get_photos(event.user_id, worksheet['id'])
                     self.offset += 10
 
 
-                    self.message_send(
+                    if outcome:
+                        self.message_send(
                         event.user_id,
                         f'имя: {worksheet["name"]} ссылка: vk.com/{worksheet["id"]}',
-                        attachment=photo_string)
+                        attachment=outcome
+                       )
+                    else:
+                        self.message_send(
+                            event.user_id,
+                            f'имя: {worksheet["name"]}, эту анкету уже смотрели, введите еще раз "поиск"')
 
                 elif event.text.lower() == 'пока':
                     self.message_send(event.user_id, 'До новых встреч')
@@ -126,7 +100,6 @@ class BotInterface():
 
 
 if __name__ == '__main__':
-    # data_store.Base.metadata.drop_all(data_store.engine)
     data_store.Base.metadata.create_all(data_store.engine)
     bot_interface =BotInterface(comunity_token, access_token)
     bot_interface.event_handler()

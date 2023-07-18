@@ -37,10 +37,3 @@ def check_user(engine, profile_id, worksheet_id):
 
 if __name__ == '__main__':
     pass
-    # engine = create_engine(db_url_object)
-    # Base.metadata.drop_all(engine)
-    # Base.metadata.create_all(engine)
-    # add = add_user()
-    # add_user(engine, 2113, 124512)
-    # res = check_user(engine, 809882336, 3177052)
-    # print(res)
